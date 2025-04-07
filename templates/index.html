@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Algoritmo de Dijkstra</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            background-color: #e7eff6;
+            color: #333;
+        }
+
+        h2 {
+            color: #0077b6;
+        }
+
+        form, canvas, .form-section {
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            margin: 20px auto;
+            max-width: 500px;
+        }
+
+        button {
+            background-color: #0077b6;
+            color: #ffffff;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #005f87;
+        }
+
+        input, select {
+            margin: 5px 0;
+            padding: 5px;
+            font-size: 16px;
+        }
+
+        .step-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        .flex-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+        }
+
+        canvas {
+            border: 1px solid #ccc;
+        }
+
+        #result {
+            font-size: 18px;
+            font-weight: bold;
+            color: #38b000;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Primera parte: Paso 1 -->
+    <div id="step1" class="step-container">
+        <h2>Paso 1: Ingresar el número de nodos</h2>
+        <form onsubmit="event.preventDefault(); goToStep2()">
+            <label for="nodeCount">Número de nodos:</label>
+            <input type="number" id="nodeCount" min="2" required>
+            <button type="submit">Siguiente</button>
+        </form>
+    </div>
+
+    <!-- Segunda parte: Paso 2 -->
+    <div id="step2" class="step-container" style="display:none;">
+        <h2>Paso 2: Ingresar conexiones entre nodos</h2>
+        <div class="flex-container">
+            <div class="form-section">
+                <form id="edgeForm" onsubmit="event.preventDefault(); addEdge()">
+                    <label for="fromNode">Desde:</label>
+                    <select id="fromNode"></select>
+                    <label for="toNode">Hasta:</label>
+                    <select id="toNode"></select>
+                    <label for="distance">Distancia:</label>
+                    <input type="number" id="distance" min="1" required>
+                    <button type="submit">Agregar conexión</button>
+                </form>
+                <br>
+                <label for="startNode">Nodo de inicio para Dijkstra:</label>
+                <select id="startNode"></select>
+                <br><br>
+                <label for="endNode">Nodo de destino para Dijkstra:</label>
+                <select id="endNode"></select>
+                <br><br>
+                <button onclick="solveDijkstra()">Resolver Dijkstra</button>
+                <button onclick="resetApp()">Reiniciar</button>
+                <div id="result" style="margin-top: 20px;"></div>
+            </div>
+            <canvas id="graphCanvas" width="600" height="400"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let nodeCount = 0;
+        let edges = [];
+        let nodePositions = {};
+        let dijkstraPaths = [];
+
+        function goToStep2() {
+            nodeCount = parseInt(document.getElementById('nodeCount').value);
+            if (nodeCount < 2) return;
+
+            const fromNode = document.getElementById('fromNode');
+            const toNode = document.getElementById('toNode');
+            const startNode = document.getElementById('startNode');
+            const endNode = document.getElementById('endNode');
+
+            fromNode.innerHTML = '';
+            toNode.innerHTML = '';
+            startNode.innerHTML = '';
+            endNode.innerHTML = '';
+
+            for (let i = 0; i < nodeCount; i++) {
+                const option = new Option(`Nodo ${i}`, i);
+                fromNode.add(option.cloneNode(true));
+                toNode.add(option.cloneNode(true));
+                startNode.add(option.cloneNode(true));
+                endNode.add(option.cloneNode(true));
+
+                const angle = 2 * Math.PI * i / nodeCount;
+                nodePositions[i] = {
+                    x: 300 + 150 * Math.cos(angle),
+                    y: 200 + 150 * Math.sin(angle)
+                };
+            }
+
+            document.getElementById('step1').style.display = 'none';
+            document.getElementById('step2').style.display = 'flex';
+            drawGraph();
+        }
+
+        function addEdge() {
+            const from = parseInt(document.getElementById('fromNode').value);
+            const to = parseInt(document.getElementById('toNode').value);
+            const distance = parseInt(document.getElementById('distance').value);
+            if (from !== to) {
+                edges.push({ from, to, distance });
+                drawGraph();
+            }
+        }
+
+        function drawGraph() {
+            const canvas = document.getElementById('graphCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Dibujar aristas
+            edges.forEach(({ from, to, distance }) => {
+                const a = nodePositions[from];
+                const b = nodePositions[to];
+                ctx.beginPath();
+                ctx.moveTo(a.x, a.y);
+                ctx.lineTo(b.x, b.y);
+                ctx.stroke();
+                const midX = (a.x + b.x) / 2;
+                const midY = (a.y + b.y) / 2;
+                ctx.fillText(distance, midX, midY);
+            });
+
+            // Resaltar caminos mínimos
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 2;
+            dijkstraPaths.forEach(path => {
+                for (let i = 0; i < path.length - 1; i++) {
+                    const a = nodePositions[path[i]];
+                    const b = nodePositions[path[i + 1]];
+                    ctx.beginPath();
+                    ctx.moveTo(a.x, a.y);
+                    ctx.lineTo(b.x, b.y);
+                    ctx.stroke();
+                }
+            });
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'black';
+
+            // Dibujar nodos
+            for (let i = 0; i < nodeCount; i++) {
+                const { x, y } = nodePositions[i];
+                ctx.beginPath();
+                ctx.arc(x, y, 20, 0, 2 * Math.PI);
+                ctx.fillStyle = 'lightblue';
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = 'black';
+                ctx.fillText(`Nodo ${i}`, x - 15, y + 5);
+            }
+        }
+
+        function solveDijkstra() {
+            const startNode = parseInt(document.getElementById('startNode').value);
+            const endNode = parseInt(document.getElementById('endNode').value);
+
+            fetch('/api/solve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nodeCount, edges, startNode, endNode })
+            })
+            .then(res => res.json())
+            .then(data => {
+                dijkstraPaths = data.paths;
+                drawGraph();
+
+                const distancesText = `Distancia desde el nodo ${startNode} hasta el nodo ${endNode}: ${data.distances[endNode]}`;
+                const pathText = `Ruta más corta: ${data.paths[0].join(' -> ')}`;
+
+                document.getElementById('result').innerHTML = `
+                    <p><strong>${distancesText}</strong></p>
+                    <p>${pathText}</p>
+                `;
+            });
+        }
+
+        function resetApp() {
+            nodeCount = 0;
+            edges = [];
+            nodePositions = {};
+            dijkstraPaths = [];
+
+            document.getElementById('fromNode').innerHTML = '';
+            document.getElementById('toNode').innerHTML = '';
+            document.getElementById('startNode').innerHTML = '';
+            document.getElementById('endNode').innerHTML = '';
+            document.getElementById('nodeCount').value = '';
+
+            document.getElementById('step1').style.display = 'flex';
+            document.getElementById('step2').style.display = 'none';
+
+            const canvas = document.getElementById('graphCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+    </script>
+</body>
+</html>
